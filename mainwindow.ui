@@ -6,8 +6,8 @@
 			<rect>
 				<x>0</x>
 				<y>0</y>
-				<width>275</width>
-				<height>314</height>
+				<width>400</width>
+				<height>500</height>
 			</rect>
 		</property>
 		<property name="windowTitle">
@@ -29,7 +29,7 @@
 				<item>
 					<widget class="QLabel" name="pauseTimeLabel">
 						<property name="text">
-							<string>Time between actions:</string>
+							<string>Time between actions (set longer time for slower computer):</string>
 						</property>
 					</widget>
 				</item>

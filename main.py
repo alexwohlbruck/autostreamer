@@ -1,5 +1,6 @@
 import sys
 import os
+from apscheduler.jobstores.base import JobLookupError
 import yaml
 import time
 import json
@@ -10,13 +11,16 @@ import pyautogui as ui
 import win32gui
 from PyQt5 import QtWidgets, QtCore, uic
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMessageBox
 from apiclient import discovery
 from apiclient.discovery import build
+from googleapiclient.errors import HttpError
 from dotenv import load_dotenv
 
-CALENDAR_ID = 'mao8fkb7tiinqorlbm6s17fq6s@group.calendar.google.com'
-ui.PAUSE = .1 # Auto GUI pause between actions
+import faulthandler
+# necessary to disable first or else new threads may not be handled.
+faulthandler.disable()
+faulthandler.enable(all_threads=True)
 
 load_dotenv()
 
@@ -27,6 +31,30 @@ sched = BackgroundScheduler()
 sched.start()
 
 Ui_MainWindow, QtBaseClass = uic.loadUiType('mainwindow.ui')
+
+def load_config():
+    config_filename = 'config.yaml'
+    empty_config = {
+        'calendar_id': '',
+        'pause_time': 0.5
+    }
+    try:
+        with open(config_filename, 'r') as stream:
+            try:
+                config = yaml.safe_load(stream)
+                print(config)
+                return config if config else empty_config
+            except yaml.YAMLError as exc:
+                print(exc)
+    except FileNotFoundError as error:
+        open(config_filename, 'w')
+        return empty_config
+
+def find(lst, key, value):
+    for i, dic in enumerate(lst):
+        if dic[key] in value:
+            return i
+    return -1
 
 class EventModel(QtCore.QAbstractListModel):
     def __init__(self, *args, events=None, **kwargs):
@@ -48,75 +76,105 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.setupUi(self)
         self.model = EventModel()
-        self.scheduler = EventScheduler(self.model)
-        self.loadEvents()
-        self.eventView.setModel(self.model)
-        self.saveButton.pressed.connect(self.save)
 
-    def add(self):
-        """
-        Add an item to our event list, getting the text from the QLineEdit .calendarIdEdit
-        and then clearing it.
-        """
-        text = self.calendarIdEdit.text()
-        if text: # Don't add empty strings.
-            # Access the list via the model.
-            self.model.events.append((False, text))
-            # Trigger refresh.        
-            self.model.layoutChanged.emit()
-            # Empty the input
-            self.calendarIdEdit.setText("")
-            self.save()
-    
-    def loadEvents(self):
-        self.scheduler.get_events()
-
-    def save(self):
-        self.loadEvents()
-
-class EventScheduler():
-
-    def __init__(self, event_model):
         self.ui_controller = UIController()
-        self.event_model = event_model
         self.jobs = {
             #'eventID + timestamp': Job
         }
 
-    def get_events(self):
+        self.config = load_config()
+
+        self.calendarIdEdit.setText(self.config.get('calendar_id'))
+        self.pauseTimeEdit.setText(str(self.config.get('pause_time')))
+        self.get_events(self.config)
+
+        self.eventView.setModel(self.model)
+        self.saveButton.pressed.connect(self.save)
+        
+        # Refresh data every 5 minutes
+        sched.add_job(self.get_events, 'interval', seconds=5, args=[self.config])
+
+
+
+    def show_error(self, title, message):
+        QMessageBox.warning(self, title, message)
+
+    def save(self):
+        calendar_id = self.calendarIdEdit.text()
+        pause_time = self.pauseTimeEdit.text()
+
+        try:
+            f_pause_time = float(pause_time)
+
+            config = {
+                'calendar_id': calendar_id,
+                'pause_time': f_pause_time
+            }
+
+            with open('config.yaml', 'w') as file:
+                yaml.dump(config, file, default_flow_style=False)
+
+            self.get_events(config)
+            
+        except ValueError:
+            self.show_error('Value error', 'Enter a number in seconds for time between actions (ex. 0.5)')
+
+
+    def get_events(self, config):
+
+        ui.PAUSE = config.get('pause_time') # Auto GUI pause between actions
+
         now = datetime.utcnow().isoformat() + 'Z'
-        eventsResult = calendar.events().list(calendarId=CALENDAR_ID, timeMin=now, maxResults=50, singleEvents=True, orderBy='startTime').execute()
-        events = eventsResult.get('items', [])
-        
-        self.schedule_diff_events(events)
-        self.event_model.events = events
-        self.event_model.layoutChanged.emit()
-        
-        return events
 
-    def schedule_diff_events(self, events):
+        try:
+            eventsResult = calendar.events().list(calendarId=config.get('calendar_id'), timeMin=now, maxResults=50, singleEvents=True, orderBy='startTime').execute()
+            events = eventsResult.get('items', [])
+            
+            self.diff_events(events)
 
-        # If an event has been modified, then remove the job
+            return events
+
+        except:
+            return []
+
+
+    def get_event_key(self, event):
+        return event.get('id') + event.get('start').get('dateTime', event.get('start').get('date'))
+
+    def diff_events(self, events):
+
+        # If an event has been modified, then remove the event
         for key in list(self.jobs):
-            if not any((event.get('id') + event.get('start').get('dateTime', event.get('start').get('date'))) == key for event in events):
-                self.jobs.get(key).remove()
-                del self.jobs[key]
+            if not any(self.get_event_key(event) == key for event in events):
+                try:
+                    self.jobs.get(key).remove()
+                    del self.model.events[find(self.model.events, 'id', key)]
+                    del self.jobs[key]
+
+                    print('Job removed')
+                except JobLookupError as error:
+                    print("Couldn't remove job")
 
         # Check for new events in incoming data
         for event in events:
-            eid = event.get('id')
+            key = self.get_event_key(event)
 
-            if eid not in self.jobs:
+            if key not in self.jobs.keys():
                 # New event, create job
                 start = event.get('start').get('dateTime', event.get('start').get('date'))
                 start_datetime = parse(start)#.replace(tzinfo=None)
 
-                eid = event.get('id')
                 description = yaml.safe_load(event.get('description'))
                 url = description.get('url')
 
                 job = sched.add_job(self.ui_controller.open_url, 'date', run_date=start_datetime, args=[url])
-                self.jobs[eid + event.get('start').get('dateTime', event.get('start').get('date'))] = job
+                
+                self.model.events.append(event)
+                self.jobs[self.get_event_key(event)] = job
+
+                print('Job added', len(self.jobs))
+        
+        self.model.layoutChanged.emit()
 
 class UIController():
         
