@@ -5,7 +5,7 @@ import time
 import json
 from datetime import datetime, timedelta
 from dateutil.parser import parse
-from apscheduler.scheduler import Scheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 import pyautogui as ui
 import win32gui
 from PyQt5 import QtWidgets, QtCore, uic
@@ -23,7 +23,7 @@ load_dotenv()
 dev_Key = os.getenv('GOOGLE_API_KEY')
 calendar = build('calendar', 'v3', developerKey=dev_Key)
 
-sched = Scheduler()
+sched = BackgroundScheduler()
 sched.start()
 
 Ui_MainWindow, QtBaseClass = uic.loadUiType('mainwindow.ui')
@@ -77,38 +77,55 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 class EventScheduler():
 
     def __init__(self, event_model):
+        self.ui_controller = UIController()
         self.event_model = event_model
+        self.jobs = {
+            #'eventID + timestamp': Job
+        }
 
     def get_events(self):
         now = datetime.utcnow().isoformat() + 'Z'
         eventsResult = calendar.events().list(calendarId=CALENDAR_ID, timeMin=now, maxResults=50, singleEvents=True, orderBy='startTime').execute()
         events = eventsResult.get('items', [])
-
+        
+        self.schedule_diff_events(events)
         self.event_model.events = events
         self.event_model.layoutChanged.emit()
+        
         return events
 
-    def schedule_jobs(self, events):
+    def schedule_diff_events(self, events):
+
+        # If an event has been modified, then remove the job
+        for key in list(self.jobs):
+            if not any((event.get('id') + event.get('start').get('dateTime', event.get('start').get('date'))) == key for event in events):
+                self.jobs.get(key).remove()
+                del self.jobs[key]
+
+        # Check for new events in incoming data
         for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            start_datetime = parse(start).replace(tzinfo=None)
+            eid = event.get('id')
 
-            description = yaml.safe_load(event['description'])
-            url = description.get('url')
+            if eid not in self.jobs:
+                # New event, create job
+                start = event.get('start').get('dateTime', event.get('start').get('date'))
+                start_datetime = parse(start)#.replace(tzinfo=None)
 
-            sched.add_date_job(UIController.open_url, start_datetime, [url])
+                eid = event.get('id')
+                description = yaml.safe_load(event.get('description'))
+                url = description.get('url')
+
+                job = sched.add_job(self.ui_controller.open_url, 'date', run_date=start_datetime, args=[url])
+                self.jobs[eid + event.get('start').get('dateTime', event.get('start').get('date'))] = job
 
 class UIController():
-
-    def __init__(self):
-        print('test')
         
     def focus_browser(self):
         if not self.search_chrome_window():
             self.open_chrome()
         time.sleep(.1)
 
-    def windowEnumerationHandler(slef, hwnd, top_windows):
+    def windowEnumerationHandler(self, hwnd, top_windows):
         top_windows.append((hwnd, win32gui.GetWindowText(hwnd)))
 
     def search_chrome_window(self):

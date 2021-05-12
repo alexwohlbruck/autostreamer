@@ -1,4 +1,4 @@
-APScheduler==2.1.2
+APScheduler==3.7.0
 beautiful-date==2.0.0
 cachetools==4.2.2
 certifi==2020.12.5
