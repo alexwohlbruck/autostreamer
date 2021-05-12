@@ -36,7 +36,8 @@ def load_config():
     config_filename = 'config.yaml'
     empty_config = {
         'calendar_id': '',
-        'pause_time': 0.5
+        'pause_time': 0.5,
+        'refresh_time': 5
     }
     try:
         with open(config_filename, 'r') as stream:
@@ -64,7 +65,7 @@ class EventModel(QtCore.QAbstractListModel):
     def data(self, index, role):
         if role == Qt.DisplayRole:
             event = self.events[index.row()]
-            return event.get('summary') + '  -  ' + event.get('start').get('dateTime')
+            return event.get('start').get('dateTime') + '  -  ' + event.get('summary')
 
     def rowCount(self, index):
         return len(self.events)
@@ -86,29 +87,40 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.calendarIdEdit.setText(self.config.get('calendar_id'))
         self.pauseTimeEdit.setText(str(self.config.get('pause_time')))
+        self.refreshTimeEdit.setText(str(self.config.get('refresh_time')))
         self.get_events(self.config)
 
         self.eventView.setModel(self.model)
         self.saveButton.pressed.connect(self.save)
         
         # Refresh data every 5 minutes
-        sched.add_job(self.get_events, 'interval', seconds=5, args=[self.config])
-
+        self.refresh_job = None
+        self.set_refresh_interval(self.config.get('refresh_time'))
 
 
     def show_error(self, title, message):
         QMessageBox.warning(self, title, message)
 
+    def set_refresh_interval(self, minutes=5):
+        if (self.refresh_job):
+            self.refresh_job.remove()
+        self.refresh_job = sched.add_job(self.get_events, 'interval', minutes=minutes, args=[self.config])
+
     def save(self):
         calendar_id = self.calendarIdEdit.text()
         pause_time = self.pauseTimeEdit.text()
+        refresh_time = self.refreshTimeEdit.text()
 
         try:
             f_pause_time = float(pause_time)
+            i_refresh_time = int(refresh_time)
+
+            self.set_refresh_interval(i_refresh_time)
 
             config = {
                 'calendar_id': calendar_id,
-                'pause_time': f_pause_time
+                'pause_time': f_pause_time,
+                'refresh_time': i_refresh_time
             }
 
             with open('config.yaml', 'w') as file:
@@ -117,10 +129,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.get_events(config)
             
         except ValueError:
-            self.show_error('Value error', 'Enter a number in seconds for time between actions (ex. 0.5)')
+            self.show_error('Value error', 'Enter a number for pause time and refresh time')
 
 
     def get_events(self, config):
+
+        print('getting events')
 
         ui.PAUSE = config.get('pause_time') # Auto GUI pause between actions
 
@@ -131,6 +145,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             events = eventsResult.get('items', [])
             
             self.diff_events(events)
+            self.model.layoutChanged.emit()
 
             return events
 
@@ -152,7 +167,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     del self.jobs[key]
 
                     print('Job removed')
-                except JobLookupError as error:
+                except JobLookupError:
                     print("Couldn't remove job")
 
         # Check for new events in incoming data
@@ -193,10 +208,14 @@ class UIController():
         
         for i in top_windows:
             if "chrome" in i[1].lower():
-                found_window = True
-                win32gui.ShowWindow(i[0],5)
-                win32gui.SetForegroundWindow(i[0])
-                break
+                try:
+                    found_window = True
+                    win32gui.ShowWindow(i[0],5)
+                    win32gui.SetForegroundWindow(i[0])
+                    break
+                except:
+                    print("couldn't focus browser")
+                    break;
 
         return found_window
 

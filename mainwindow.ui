@@ -29,12 +29,22 @@
 				<item>
 					<widget class="QLabel" name="pauseTimeLabel">
 						<property name="text">
-							<string>Time between actions (set longer time for slower computer):</string>
+							<string>Time between actions (seconds) (set longer time for slower computer):</string>
 						</property>
 					</widget>
 				</item>
 				<item>
 					<widget class="QLineEdit" name="pauseTimeEdit"/>
+				</item>
+				<item>
+					<widget class="QLabel" name="refreshTimeLabel">
+						<property name="text">
+							<string>Refresh interval (minutes):</string>
+						</property>
+					</widget>
+				</item>
+				<item>
+					<widget class="QLineEdit" name="refreshTimeEdit"/>
 				</item>
 
 				<item>
