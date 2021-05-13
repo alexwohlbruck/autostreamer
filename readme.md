@@ -51,19 +51,13 @@ Locate and run `main.exe` in `dist/autostreamer`.
    
 ![Calendar ID](img/id.png)
 
-![Calendar ID](img/app_id.png)
-   
 4. In the next field, enter a time in seconds for the app to wait inbetween each on-screen action. Enter a higher number if your have a slow-running computer.
-   
-![Calendar ID](img/time.png)
    
 5. Choose a refresh interval in minutes for the app to periodically refresh the calendar data.
    
-![Time between actions](img/interval.png)
-   
 6. Click "Save changes and load events". The upcoming events on your calendar will be shown below.
    
-![Save changes and load events](img/save.png)
+![Save changes and load events](img/config.png)
    
 The events will be refeshed every few minutes according to your refresh interval. To refresh manually, click the save changes button again.
 
