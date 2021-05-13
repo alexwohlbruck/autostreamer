@@ -2,7 +2,7 @@
 
 Automatically play streaming content based on your Google calendar schedule.
 
-![Screenshot of app](./screenshot.png)
+![Screenshot of app](img/screenshot.png)
 
 ## Requirements
 - Python 3.7 or above
@@ -37,17 +37,32 @@ Locate and run `main.exe` in `dist/autostreamer`.
 
 1. Create a new calendar in Google Calendar in the left pane under "Other calendars".
    
-2. Click on the menu button by your new calendar, and go to "Settings and sharing".
+![Add calendar](img/add.png)
    
-3. Under the "Access Permissions" section, check the box to make the calendar public.
+1. Click on the menu button by your new calendar, and go to "Settings and sharing".
    
-4. Under the "Integrate calendar" section, copy the calendar ID and paste it in the calendar ID field in the app.
+![Settings and sharing](img/settings.png)
    
-5. In the next field, enter a time in seconds for the app to wait inbetween each on-screen action. Enter a higher number if your have a slow-running computer.
+2. Under the "Access Permissions" section, check the box to make the calendar public.
+
+![Access permissino](img/permissions.png)
    
-6. Choose a refresh interval in minutes for the app to periodically refresh the calendar data.
+3. Under the "Integrate calendar" section, copy the calendar ID and paste it in the calendar ID field in the app.
    
-7. Click "Save changes and load events". The upcoming events on your calendar will be shown below.
+![Calendar ID](img/id.png)
+![Calendar ID](img/app_id.png)
+   
+4. In the next field, enter a time in seconds for the app to wait inbetween each on-screen action. Enter a higher number if your have a slow-running computer.
+   
+![Calendar ID](img/time.png)
+   
+5. Choose a refresh interval in minutes for the app to periodically refresh the calendar data.
+   
+![Time between actions](img/interval.png)
+   
+6. Click "Save changes and load events". The upcoming events on your calendar will be shown below.
+   
+![Save changes and load events](img/save.png)
    
 The events will be refeshed every few minutes according to your refresh interval. To refresh manually, click the save changes button again.
 
