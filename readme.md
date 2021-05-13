@@ -50,6 +50,7 @@ Locate and run `main.exe` in `dist/autostreamer`.
 3. Under the "Integrate calendar" section, copy the calendar ID and paste it in the calendar ID field in the app.
    
 ![Calendar ID](img/id.png)
+
 ![Calendar ID](img/app_id.png)
    
 4. In the next field, enter a time in seconds for the app to wait inbetween each on-screen action. Enter a higher number if your have a slow-running computer.
